@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <title>Discord Clone - VoIP HTTPS</title>
-    <!-- Biblioteca PeerJS oficial via Cloudflare (Mais aceita pelo GitHub) -->
+    <!-- Importação da Biblioteca -->
     <script src="https://cdnjs.cloudflare.com"></script>
     <style>
         body { margin: 0; background: #313338; color: white; font-family: sans-serif; display: flex; height: 100vh; }
         .sidebar { width: 280px; background: #2b2d31; padding: 20px; border-right: 1px solid #1e1f22; display: flex; flex-direction: column; gap: 15px; }
-        .status { padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; font-size: 12px; background: #404249; }
+        .status { padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; font-size: 12px; background: #404249; color: #b9bbbe; }
         .btn { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #5865f2; }
         .btn:hover { background: #4752c4; }
         .btn-call { background: #23a559; }
         input { padding: 10px; border-radius: 4px; border: none; background: #1e1f22; color: white; outline: none; }
         .chat { flex: 1; display: flex; flex-direction: column; padding: 20px; }
-        #log { flex: 1; overflow-y: auto; font-size: 14px; color: #b9bbbe; }
+        #log { flex: 1; overflow-y: auto; font-size: 14px; color: #b9bbbe; font-family: monospace; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <h3 style="margin:0">VOIP CANAL</h3>
-        <div id="status-box" class="status">CONECTANDO AO SERVIDOR...</div>
+        <div id="status-box" class="status">INICIALIZANDO...</div>
         
         <p style="font-size: 11px; margin:0">SEU ID (Passe para o amigo):</p>
         <input type="text" id="my-id" readonly placeholder="Gerando ID...">
@@ -34,8 +34,8 @@
     </div>
 
     <div class="chat">
-        <div id="log">Aguardando conexão...</div>
-        <input type="text" placeholder="Conversar no chat..." style="margin-top: 20px; width: 100%; padding: 15px; background: #383a40; box-sizing: border-box;">
+        <div id="log">Aguardando sistema...</div>
+        <input type="text" placeholder="Conversar no chat..." style="margin-top: 20px; width: 100%; padding: 15px; background: #383a40; box-sizing: border-box; border-radius: 8px; border: none; color: white;">
     </div>
 
     <audio id="remote-audio" autoplay></audio>
@@ -48,59 +48,66 @@
         const remoteAudio = document.getElementById('remote-audio');
         const log = document.getElementById('log');
 
-        function addLog(msg) { log.innerHTML += `<div>> ${msg}</div>`; }
+        function addLog(msg) { log.innerHTML += `<div>> ${msg}</div>`; log.scrollTop = log.scrollHeight; }
 
-        // Inicializa o Peer
-        const peer = new Peer(undefined, {
-            host: '0.peerjs.com',
-            port: 443,
-            secure: true,
-            debug: 3
-        });
+        // FUNÇÃO DE INICIALIZAÇÃO SEGURA
+        function initApp() {
+            if (typeof Peer === 'undefined') {
+                addLog("Aguardando biblioteca PeerJS...");
+                setTimeout(initApp, 500); // Tenta novamente em meio segundo
+                return;
+            }
 
-        // Quando o servidor gera seu ID
-        peer.on('open', (id) => {
-            myIdInput.value = id;
-            statusBox.innerText = "ONLINE - PRONTO";
-            statusBox.style.color = "#23a559";
-            addLog("Servidor pronto. Seu ID: " + id);
-        });
+            addLog("Biblioteca carregada. Conectando ao servidor...");
 
-        peer.on('error', (err) => {
-            statusBox.innerText = "ERRO: " + err.type;
-            statusBox.style.color = "#f23f43";
-            addLog("Erro detectado: " + err.type);
-        });
-
-        // RECEBER CHAMADA
-        peer.on('call', (call) => {
-            addLog("Recebendo chamada...");
-            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                call.answer(stream);
-                call.on('stream', (remoteStream) => {
-                    remoteAudio.srcObject = remoteStream;
-                    addLog("Conectado ao áudio do amigo!");
-                });
-            }).catch(e => addLog("Erro ao acessar microfone: " + e));
-        });
-
-        // INICIAR CHAMADA
-        callBtn.onclick = () => {
-            const id = friendIdInput.value.trim();
-            if(!id) return alert("Insira o ID do amigo!");
-            
-            addLog("Tentando ligar para: " + id);
-            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                const call = peer.call(id, stream);
-                call.on('stream', (remoteStream) => {
-                    remoteAudio.srcObject = remoteStream;
-                    addLog("Chamada iniciada com sucesso!");
-                });
-            }).catch(e => {
-                addLog("Erro microfone: " + e);
-                alert("Verifique se o microfone está permitido no navegador.");
+            const peer = new Peer(undefined, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                debug: 1
             });
-        };
+
+            peer.on('open', (id) => {
+                myIdInput.value = id;
+                statusBox.innerText = "ONLINE - PRONTO";
+                statusBox.style.color = "#23a559";
+                addLog("Servidor pronto! Seu ID é: " + id);
+            });
+
+            peer.on('error', (err) => {
+                statusBox.innerText = "ERRO: " + err.type;
+                statusBox.style.color = "#f23f43";
+                addLog("Erro: " + err.type);
+            });
+
+            peer.on('call', (call) => {
+                addLog("Recebendo chamada...");
+                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                    call.answer(stream);
+                    call.on('stream', (remoteStream) => {
+                        remoteAudio.srcObject = remoteStream;
+                        addLog("Voz do amigo conectada!");
+                    });
+                }).catch(e => addLog("Erro microfone: " + e));
+            });
+
+            callBtn.onclick = () => {
+                const id = friendIdInput.value.trim();
+                if(!id) return alert("Insira o ID do amigo!");
+                
+                addLog("Chamando ID: " + id);
+                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                    const call = peer.call(id, stream);
+                    call.on('stream', (remoteStream) => {
+                        remoteAudio.srcObject = remoteStream;
+                        addLog("Chamada ativa!");
+                    });
+                }).catch(e => addLog("Erro microfone: " + e));
+            };
+        }
+
+        // Inicia o processo de carregamento
+        initApp();
     </script>
 </body>
 </html>
