@@ -2,109 +2,96 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Discord Clone - VoIP 100% Online</title>
+    <title>Discord Clone - VoIP Direto</title>
     <style>
         body { margin: 0; background: #313338; color: white; font-family: sans-serif; display: flex; height: 100vh; }
-        .sidebar { width: 280px; background: #2b2d31; padding: 20px; border-right: 1px solid #1e1f22; display: flex; flex-direction: column; gap: 15px; }
-        .btn { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #23a559; }
-        input { padding: 10px; border-radius: 4px; border: none; background: #1e1f22; color: white; outline: none; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
-        #status { font-size: 12px; color: #f23f43; text-align: center; font-weight: bold; }
-        #log { color: #949ba4; font-size: 13px; overflow-y: auto; flex: 1; }
+        .sidebar { width: 320px; background: #2b2d31; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #1e1f22; }
+        .status { padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; background: #404249; color: #b9bbbe; }
+        button { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #5865f2; }
+        button:hover { background: #4752c4; }
+        textarea { width: 100%; height: 120px; background: #1e1f22; color: #dcddde; border: 1px solid #444; border-radius: 5px; padding: 8px; font-size: 10px; font-family: monospace; resize: none; outline: none; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <h3 style="margin:0">CANAL DE VOZ</h3>
-        <div id="status">INICIALIZANDO...</div>
+        <h3 style="margin:0">VOIP DIRETO (P2P)</h3>
+        <div id="status" class="status">SISTEMA PRONTO</div>
         
-        <label style="font-size: 11px;">SEU ID (Envie ao amigo):</label>
-        <input type="text" id="my-id" readonly placeholder="Aguardando...">
+        <button id="btn-iniciar">1. CRIAR CHAMADA</button>
+        <p style="font-size: 11px; margin:0">MEU CÓDIGO (Envie para o amigo):</p>
+        <textarea id="meu-codigo" readonly></textarea>
+        
+        <hr style="border:0; border-top:1px solid #444;">
 
-        <label style="font-size: 11px;">ID DO AMIGO:</label>
-        <input type="text" id="friend-id" placeholder="Cole o ID aqui">
-        <button id="call-btn" class="btn">ENTRAR NA VOZ</button>
+        <p style="font-size: 11px; margin:0">CÓDIGO DO AMIGO (Cole aqui):</p>
+        <textarea id="codigo-amigo" placeholder="Cole o código dele aqui..."></textarea>
+        <button id="btn-conectar" style="background: #23a559;">2. CONECTAR VOZ</button>
     </div>
 
-    <div style="flex:1; padding:20px; display: flex; flex-direction: column;">
-        <div id="log"></div>
+    <div style="flex:1; padding:20px;">
+        <div id="chat-log" style="color: #949ba4; font-size: 14px;">> Aguardando ação...</div>
     </div>
 
     <audio id="remote-audio" autoplay></audio>
 
-    <!-- BIBLIOTECA PEERJS 1.5.4 COMPLETA E EMBUTIDA -->
-    <script src="https://cdn.jsdelivr.net"></script>
-
     <script>
-        const chatLog = document.getElementById('log');
-        const statusDiv = document.getElementById('status');
-        const myIdInput = document.getElementById('my-id');
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        const remoteAudio = document.getElementById('remote-audio');
+        const log = (m) => document.getElementById('chat-log').innerHTML += `<div>> ${m}</div>`;
 
-        function log(msg) { 
-            chatLog.innerHTML += `<div>> ${msg}</div>`; 
-            chatLog.scrollTop = chatLog.scrollHeight; 
+        // Captura áudio do microfone
+        async function getMic() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            return stream;
         }
 
-        // Função para garantir que a biblioteca carregue
-        function startApp() {
-            if (typeof Peer === 'undefined') {
-                log("Tentando carregar biblioteca...");
-                setTimeout(startApp, 1000);
-                return;
-            }
+        // Recebe o áudio do outro lado
+        pc.ontrack = (event) => {
+            remoteAudio.srcObject = event.streams[0];
+            document.getElementById('status').innerText = "CONECTADO!";
+            document.getElementById('status').style.color = "#23a559";
+        };
 
-            log("Biblioteca carregada. Conectando ao servidor...");
-
-            // Configuração padrão simplificada
-            const peer = new Peer({
-                debug: 2,
-                config: {
-                    'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]
+        // PASSO 1: Criar a oferta (Gerar código)
+        document.getElementById('btn-iniciar').onclick = async () => {
+            await getMic();
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            // Espera os candidatos ICE carregarem para gerar o código final
+            pc.onicecandidate = (event) => {
+                if (!event.candidate) {
+                    document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription));
+                    log("Código gerado! Envie para seu amigo.");
                 }
-            });
-
-            peer.on('open', (id) => {
-                myIdInput.value = id;
-                statusDiv.innerText = "ONLINE";
-                statusDiv.style.color = "#23a559";
-                log("Sucesso! Passe seu ID para o amigo.");
-            });
-
-            peer.on('error', (err) => {
-                log("Erro: " + err.type);
-                statusDiv.innerText = "ERRO: " + err.type;
-            });
-
-            peer.on('call', (call) => {
-                log("Recebendo chamada...");
-                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                    call.answer(stream);
-                    call.on('stream', (remoteStream) => {
-                        document.getElementById('remote-audio').srcObject = remoteStream;
-                        log("Conectado ao áudio!");
-                    });
-                }).catch(e => log("Erro no mic: " + e));
-            });
-
-            document.getElementById('call-btn').onclick = () => {
-                const friendId = document.getElementById('friend-id').value.trim();
-                if(!friendId) return alert("Insira o ID!");
-                
-                log("Chamando amigo...");
-                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                    const call = peer.call(friendId, stream);
-                    call.on('stream', (remoteStream) => {
-                        document.getElementById('remote-audio').srcObject = remoteStream;
-                        log("Chamada ativa!");
-                    });
-                }).catch(err => {
-                    log("Erro microfone: " + err);
-                    alert("Autorize o microfone no topo do navegador.");
-                });
             };
-        }
+        };
 
-        startApp();
+        // PASSO 2: Conectar usando o código do amigo
+        document.getElementById('btn-conectar').onclick = async () => {
+            const rawCode = document.getElementById('codigo-amigo').value.trim();
+            if (!rawCode) return alert("Cole o código!");
+
+            const remoteDesc = new RTCSessionDescription(JSON.parse(atob(rawCode)));
+            await pc.setRemoteDescription(remoteDesc);
+
+            if (remoteDesc.type === "offer") {
+                await getMic();
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                
+                pc.onicecandidate = (event) => {
+                    if (!event.candidate) {
+                        document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription));
+                        log("Resposta gerada! Mande este código de volta para seu amigo.");
+                    }
+                };
+            } else {
+                log("Conexão finalizada!");
+            }
+        };
     </script>
 </body>
 </html>
