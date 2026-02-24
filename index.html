@@ -2,135 +2,104 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Discord Clone - VoIP Offline-Ready</title>
+    <title>Discord Clone - VoIP HTTPS</title>
+    <!-- Biblioteca PeerJS oficial via Cloudflare (Mais aceita pelo GitHub) -->
+    <script src="https://cdnjs.cloudflare.com"></script>
     <style>
-        body { margin: 0; background: #313338; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; height: 100vh; }
-        .sidebar { width: 320px; background: #2b2d31; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #1e1f22; box-sizing: border-box; }
-        .chat { flex: 1; padding: 20px; display: flex; flex-direction: column; }
-        #status-msg { color: #f23f43; font-weight: bold; font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center; }
-        button { padding: 12px; background: #5865f2; border: none; color: white; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        button:disabled { background: #4f545c; cursor: not-allowed; opacity: 0.6; }
-        button:hover:not(:disabled) { background: #4752c4; }
-        textarea { width: 100%; height: 80px; background: #1e1f22; color: #dcddde; border: 1px solid #444; border-radius: 5px; padding: 8px; font-size: 10px; resize: none; box-sizing: border-box; outline: none; font-family: monospace; }
-        .msg-area { flex: 1; background: #313338; overflow-y: auto; border-bottom: 1px solid #3f4147; margin-bottom: 10px; padding: 10px; }
-        .step { font-size: 11px; color: #b9bbbe; text-transform: uppercase; font-weight: bold; margin-bottom: -10px; }
+        body { margin: 0; background: #313338; color: white; font-family: sans-serif; display: flex; height: 100vh; }
+        .sidebar { width: 280px; background: #2b2d31; padding: 20px; border-right: 1px solid #1e1f22; display: flex; flex-direction: column; gap: 15px; }
+        .status { padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; font-size: 12px; background: #404249; }
+        .btn { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #5865f2; }
+        .btn:hover { background: #4752c4; }
+        .btn-call { background: #23a559; }
+        input { padding: 10px; border-radius: 4px; border: none; background: #1e1f22; color: white; outline: none; }
+        .chat { flex: 1; display: flex; flex-direction: column; padding: 20px; }
+        #log { flex: 1; overflow-y: auto; font-size: 14px; color: #b9bbbe; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <h2 style="margin:0; font-size: 20px; color: #fff;">SISTEMA DE VOZ</h2>
-        <div id="status-msg">INICIALIZANDO...</div>
+        <h3 style="margin:0">VOIP CANAL</h3>
+        <div id="status-box" class="status">CONECTANDO AO SERVIDOR...</div>
         
-        <div class="step">Passo 1</div>
-        <button id="btn-mic">ATIVAR MEU MICROFONE</button>
-        
-        <div class="step">Passo 2 (Seu Código)</div>
-        <textarea id="my-code" readonly placeholder="Aguardando microfone..."></textarea>
-        
-        <div class="step">Passo 3 (Código do Amigo)</div>
-        <textarea id="friend-code" placeholder="Cole o código dele aqui..."></textarea>
-        
-        <div class="step">Passo 4</div>
-        <button id="btn-connect" disabled>CONECTAR CHAMADA</button>
-        
-        <p style="font-size: 10px; color: #949ba4; text-align: center;">Nota: Use fones para evitar eco.</p>
+        <p style="font-size: 11px; margin:0">SEU ID (Passe para o amigo):</p>
+        <input type="text" id="my-id" readonly placeholder="Gerando ID...">
+
+        <hr style="border: 0; border-top: 1px solid #444; width: 100%;">
+
+        <p style="font-size: 11px; margin:0">ID DO AMIGO:</p>
+        <input type="text" id="friend-id" placeholder="Cole o ID dele aqui">
+        <button id="call-btn" class="btn btn-call">ENTRAR NA VOZ</button>
     </div>
 
     <div class="chat">
-        <div class="msg-area" id="chat-msgs">
-            <p style="color: #23a559;"><b>Sistema:</b> Plataforma pronta para conexão P2P.</p>
-        </div>
-        <input type="text" placeholder="Escreva uma mensagem..." style="padding: 14px; background: #383a40; border: none; border-radius: 8px; color: white; outline: none;">
+        <div id="log">Aguardando conexão...</div>
+        <input type="text" placeholder="Conversar no chat..." style="margin-top: 20px; width: 100%; padding: 15px; background: #383a40; box-sizing: border-box;">
     </div>
 
     <audio id="remote-audio" autoplay></audio>
 
-    <!-- BIBLIOTECA SIMPLE-PEER EMBUTIDA DIRETAMENTE -->
     <script>
-        /** Simple-Peer v9.11.1 (Embutido para evitar erros de CORS/Rede) **/
-        !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{("undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:this).SimplePeer=e()}}((function(){return function e(t,r,n){function i(o,u){if(!r[o]){if(!t[o]){var a="function"==typeof require&&require;if(!u&&a)return a(o,!0);if(s)return s(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=r[o]={exports:{}};t[o][0].call(l.exports,(function(e){return i(t[o][1][e]||e)}),l,l.exports,e,t,r,n)}return r[o].exports}for(var s="function"==typeof require&&require,o=0;o<n.length;o++)i(n[o]);return i}({1:[function(e,t,r){"use strict";/* O código da biblioteca está processado aqui */ t.exports=function(){ /* ... código interno injetado ... */ }; },{}],2:[function(e,t,r){ /* Implementação compactada */ t.exports=function(e){const t=this;return e}; },{}]},{},[1])(1)}));
-        
-        // --- FALLBACK: Se o código acima for muito curto para sua necessidade, o navegador usará o objeto SimplePeer injetado pelo CDN abaixo se ele carregar, caso contrário usará o embutido ---
-    </script>
-    <script src="https://cdnjs.cloudflare.com"></script>
-
-    <script>
-        let localStream;
-        let peer;
-
-        const btnMic = document.getElementById('btn-mic');
-        const btnConnect = document.getElementById('btn-connect');
-        const statusMsg = document.getElementById('status-msg');
-        const myCodeTxt = document.getElementById('my-code');
-        const friendCodeTxt = document.getElementById('friend-code');
+        const statusBox = document.getElementById('status-box');
+        const myIdInput = document.getElementById('my-id');
+        const friendIdInput = document.getElementById('friend-id');
+        const callBtn = document.getElementById('call-btn');
         const remoteAudio = document.getElementById('remote-audio');
+        const log = document.getElementById('log');
 
-        // Verificação imediata
-        function checkLibrary() {
-            if (typeof SimplePeer !== 'undefined') {
-                statusMsg.innerText = "PRONTO PARA INICIAR";
-                statusMsg.style.color = "#23a559";
-                return true;
-            }
-            statusMsg.innerText = "ERRO: BIBLIOTECA NÃO ENCONTRADA";
-            return false;
-        }
+        function addLog(msg) { log.innerHTML += `<div>> ${msg}</div>`; }
 
-        setTimeout(checkLibrary, 1000);
+        // Inicializa o Peer
+        const peer = new Peer(undefined, {
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true,
+            debug: 3
+        });
 
-        btnMic.onclick = async () => {
-            try {
-                // Solicita permissão de microfone
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                
-                statusMsg.innerText = "MICROFONE ATIVADO!";
-                statusMsg.style.color = "#23a559";
-                btnMic.disabled = true;
-                btnConnect.disabled = false;
+        // Quando o servidor gera seu ID
+        peer.on('open', (id) => {
+            myIdInput.value = id;
+            statusBox.innerText = "ONLINE - PRONTO";
+            statusBox.style.color = "#23a559";
+            addLog("Servidor pronto. Seu ID: " + id);
+        });
 
-                const isInitiator = confirm("Você é o INICIADOR da chamada?\n(OK para Sim, CANCELAR se estiver respondendo a um código)");
+        peer.on('error', (err) => {
+            statusBox.innerText = "ERRO: " + err.type;
+            statusBox.style.color = "#f23f43";
+            addLog("Erro detectado: " + err.type);
+        });
 
-                peer = new SimplePeer({
-                    initiator: isInitiator,
-                    trickle: false,
-                    stream: localStream,
-                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+        // RECEBER CHAMADA
+        peer.on('call', (call) => {
+            addLog("Recebendo chamada...");
+            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                call.answer(stream);
+                call.on('stream', (remoteStream) => {
+                    remoteAudio.srcObject = remoteStream;
+                    addLog("Conectado ao áudio do amigo!");
                 });
+            }).catch(e => addLog("Erro ao acessar microfone: " + e));
+        });
 
-                peer.on('signal', data => {
-                    myCodeTxt.value = JSON.stringify(data);
-                    statusMsg.innerText = "CÓDIGO GERADO! ENVIE AO AMIGO";
+        // INICIAR CHAMADA
+        callBtn.onclick = () => {
+            const id = friendIdInput.value.trim();
+            if(!id) return alert("Insira o ID do amigo!");
+            
+            addLog("Tentando ligar para: " + id);
+            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                const call = peer.call(id, stream);
+                call.on('stream', (remoteStream) => {
+                    remoteAudio.srcObject = remoteStream;
+                    addLog("Chamada iniciada com sucesso!");
                 });
-
-                peer.on('stream', stream => {
-                    remoteAudio.srcObject = stream;
-                    statusMsg.innerText = "CONECTADO COM SUCESSO!";
-                    statusMsg.style.backgroundColor = "#23a559";
-                    statusMsg.style.color = "white";
-                });
-
-                peer.on('error', err => {
-                    console.error(err);
-                    statusMsg.innerText = "ERRO NA CONEXÃO P2P";
-                    statusMsg.style.color = "#f23f43";
-                });
-
-            } catch (err) {
-                console.error(err);
-                alert("Erro: Certifique-se de estar em um site HTTPS e permita o microfone.");
-                statusMsg.innerText = "ERRO DE PERMISSÃO";
-            }
-        };
-
-        btnConnect.onclick = () => {
-            try {
-                const json = JSON.parse(friendCodeTxt.value);
-                peer.signal(json);
-                statusMsg.innerText = "TENTANDO CONECTAR...";
-            } catch (e) {
-                alert("Código inválido! Peça ao amigo para copiar o código inteiro.");
-            }
+            }).catch(e => {
+                addLog("Erro microfone: " + e);
+                alert("Verifique se o microfone está permitido no navegador.");
+            });
         };
     </script>
 </body>
