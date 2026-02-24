@@ -3,42 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <title>Discord Clone - VoIP GitHub</title>
-    <!-- Importação Direta -->
-    <script src="https://unpkg.com"></script>
+    <!-- Versão 1.5.4 via jsDelivr (Melhor que o unpkg para o GitHub) -->
+    <script src="https://cdn.jsdelivr.net"></script>
     <style>
         body { margin: 0; background: #313338; color: white; font-family: sans-serif; display: flex; height: 100vh; }
         .sidebar { width: 280px; background: #2b2d31; padding: 20px; border-right: 1px solid #1e1f22; display: flex; flex-direction: column; gap: 15px; }
         .btn { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #23a559; }
-        input { padding: 10px; border-radius: 4px; border: none; background: #1e1f22; color: white; outline: none; margin-bottom: 10px; }
-        #status { font-size: 12px; color: #b9bbbe; text-align: center; }
+        input { padding: 10px; border-radius: 4px; border: none; background: #1e1f22; color: white; outline: none; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        #status { font-size: 12px; color: #f23f43; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <h3 style="margin:0">CANAL DE VOZ</h3>
-        <div id="status">CONECTANDO...</div>
+        <div id="status">INICIALIZANDO...</div>
         
-        <label style="font-size: 11px;">SEU ID:</label>
-        <input type="text" id="my-id" readonly>
+        <label style="font-size: 11px;">SEU ID (Passe ao amigo):</label>
+        <input type="text" id="my-id" readonly placeholder="Aguardando servidor...">
 
         <label style="font-size: 11px;">ID DO AMIGO:</label>
-        <input type="text" id="friend-id">
+        <input type="text" id="friend-id" placeholder="Cole o ID dele aqui">
         <button id="call-btn" class="btn">ENTRAR NA VOZ</button>
     </div>
 
-    <div style="flex:1; padding:20px;" id="chat-log">
-        <div style="color: #949ba4;">> Sistema pronto.</div>
+    <div style="flex:1; padding:20px; overflow-y: auto;" id="chat-log">
+        <div style="color: #949ba4;">> Sistema aguardando biblioteca...</div>
     </div>
 
     <audio id="remote-audio" autoplay></audio>
 
     <script>
         const chatLog = document.getElementById('chat-log');
-        function log(msg) { chatLog.innerHTML += `<div style="margin-bottom:5px">> ${msg}</div>`; }
+        const statusDiv = document.getElementById('status');
+        const myIdInput = document.getElementById('my-id');
 
-        // Inicialização sem parâmetros (Usa o Cloud do PeerJS automaticamente)
-        let peer;
+        function log(msg) { chatLog.innerHTML += `<div style="margin-bottom:5px">> ${msg}</div>`; chatLog.scrollTop = chatLog.scrollHeight; }
 
         function startPeer() {
             if (typeof Peer === 'undefined') {
@@ -46,46 +46,58 @@
                 return;
             }
 
-            // MUDANÇA AQUI: Sem configurações complexas para evitar erro de host
-            peer = new Peer();
+            log("Biblioteca detectada. Tentando conectar ao Cloud...");
+
+            // Configuração com servidores STUN públicos para atravessar firewalls
+            const peer = new Peer({
+                debug: 3,
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
 
             peer.on('open', (id) => {
-                document.getElementById('my-id').value = id;
-                document.getElementById('status').innerText = "ONLINE";
-                document.getElementById('status').style.color = "#23a559";
-                log("Conectado! Seu ID é: " + id);
+                myIdInput.value = id;
+                statusDiv.innerText = "ONLINE";
+                statusDiv.style.color = "#23a559";
+                log("Sucesso! Você está online com ID: " + id);
             });
 
             peer.on('error', (err) => {
-                log("Erro: " + err.type);
+                log("Erro de Conexão: " + err.type);
+                statusDiv.innerText = "ERRO: " + err.type;
                 console.error(err);
             });
 
-            // RECEBER CHAMADA
             peer.on('call', (call) => {
-                log("Recebendo chamada...");
+                log("Recebendo chamada de voz...");
                 navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
                     call.answer(stream);
                     call.on('stream', (remoteStream) => {
                         document.getElementById('remote-audio').srcObject = remoteStream;
-                        log("Áudio do amigo conectado!");
+                        log("Voz do amigo conectada!");
                     });
-                });
+                }).catch(e => log("Erro no microfone: " + e));
             });
 
-            // INICIAR CHAMADA
             document.getElementById('call-btn').onclick = () => {
-                const id = document.getElementById('friend-id').value;
-                if(!id) return alert("Insira o ID!");
+                const friendId = document.getElementById('friend-id').value.trim();
+                if(!friendId) return alert("Insira o ID!");
                 
-                log("Chamando " + id + "...");
+                log("Ligando para: " + friendId);
                 navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                    const call = peer.call(id, stream);
+                    const call = peer.call(friendId, stream);
                     call.on('stream', (remoteStream) => {
                         document.getElementById('remote-audio').srcObject = remoteStream;
-                        log("Chamada ativa!");
+                        log("Chamada estabelecida!");
                     });
-                }).catch(err => log("Erro microfone: " + err));
+                }).catch(err => {
+                    log("Falha ao abrir microfone: " + err);
+                    alert("Por favor, autorize o microfone no cadeado da URL.");
+                });
             };
         }
 
