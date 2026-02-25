@@ -2,95 +2,252 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Discord Clone - VoIP Direto</title>
+    <title>Voice Chat Pro - Fixed</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com">
     <style>
-        body { margin: 0; background: #313338; color: white; font-family: sans-serif; display: flex; height: 100vh; }
-        .sidebar { width: 320px; background: #2b2d31; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #1e1f22; }
-        .status { padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; background: #404249; color: #b9bbbe; }
-        button { padding: 12px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; background: #5865f2; }
-        button:hover { background: #4752c4; }
-        textarea { width: 100%; height: 120px; background: #1e1f22; color: #dcddde; border: 1px solid #444; border-radius: 5px; padding: 8px; font-size: 10px; font-family: monospace; resize: none; outline: none; }
+        :root { --primary: #6366f1; --success: #22c55e; --danger: #ef4444; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* LOGIN */
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: var(--card); padding: 35px; border-radius: 20px; border: 1px solid #334155; width: 360px; text-align: center; }
+        
+        .avatar-upload { position: relative; width: 110px; height: 110px; margin: 0 auto 25px; cursor: pointer; transition: 0.3s; }
+        #preview-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); background: #334155; }
+        .avatar-upload:hover #preview-img { filter: brightness(0.5); }
+        .avatar-upload::after { content: "ALTERAR"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: bold; color: white; opacity: 0; transition: 0.3s; }
+        .avatar-upload:hover::after { opacity: 1; }
+        .upload-icon { position: absolute; bottom: 5px; right: 5px; background: var(--primary); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 3px solid var(--card); }
+
+        .login-input { width: 100%; background: #0f172a; border: 2px solid #334155; padding: 14px; border-radius: 10px; color: white; outline: none; margin-bottom: 25px; box-sizing: border-box; }
+        .login-input:focus { border-color: var(--primary); }
+
+        /* SIDEBAR & MAIN */
+        .sidebar { width: 300px; background: #111827; display: flex; flex-direction: column; border-right: 1px solid #334155; padding: 20px; gap: 15px; }
+        .card { background: var(--card); padding: 12px; border-radius: 12px; border: 1px solid #334155; }
+        .label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; display: block; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-create { background: var(--primary); }
+        .btn-connect { background: var(--success); }
+        .btn-action { width: 45px; height: 45px; border-radius: 50%; background: #334155; }
+        .btn-action.mute-active { background: var(--danger); }
+        .main { flex: 1; display: flex; flex-direction: column; position: relative; }
+        #status-bar { padding: 12px 20px; background: #111827; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+        .user-avatar { width: 35px; height: 35px; border-radius: 50%; border: 2px solid transparent; object-fit: cover; background: #334155; }
+        .speaking { border-color: var(--success) !important; box-shadow: 0 0 12px var(--success); }
+        #chat-log { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #0f172a; }
+        .msg { background: var(--card); padding: 10px 15px; border-radius: 12px; max-width: 80%; align-self: flex-start; }
+        .msg.me { align-self: flex-end; background: var(--primary); }
+        .msg-nick { font-size: 9px; color: #94a3b8; margin-bottom: 3px; display: block; font-weight: bold; }
+        #typing-indicator { font-size: 11px; color: #94a3b8; padding: 5px 20px; height: 15px; font-style: italic; opacity: 0; }
+        .input-area { padding: 15px; background: #111827; display: flex; gap: 10px; border-top: 1px solid #334155; align-items: center; }
+        #chat-input { flex: 1; background: var(--card); border: 1px solid #334155; padding: 12px; border-radius: 8px; color: white; outline: none; }
+        textarea { width: 100%; height: 45px; background: #000; color: var(--primary); border: 1px solid #334155; border-radius: 5px; font-family: monospace; font-size: 9px; margin-top: 5px; resize: none; padding: 5px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2 style="margin-top:0">Configurar Perfil</h2>
+            <div class="avatar-upload" onclick="document.getElementById('file-input').click()" title="Clique para enviar sua foto">
+                <img id="preview-img" src="https://api.dicebear.com" alt="Avatar">
+                <div class="upload-icon"><i class="fa-solid fa-camera"></i></div>
+            </div>
+            <input type="file" id="file-input" hidden accept="image/*" onchange="handleFileUpload(this)">
+            <input type="text" id="nick-input" class="login-input" placeholder="Digite seu apelido..." maxlength="12">
+            <button class="btn-create" onclick="enterApp()"><i class="fa-solid fa-right-to-bracket"></i> ENTRAR</button>
+        </div>
+    </div>
+
     <div class="sidebar">
-        <h3 style="margin:0">VOIP DIRETO (P2P)</h3>
-        <div id="status" class="status">SISTEMA PRONTO</div>
-        
-        <button id="btn-iniciar">1. CRIAR CHAMADA</button>
-        <p style="font-size: 11px; margin:0">MEU CÓDIGO (Envie para o amigo):</p>
-        <textarea id="meu-codigo" readonly></textarea>
-        
-        <hr style="border:0; border-top:1px solid #444;">
-
-        <p style="font-size: 11px; margin:0">CÓDIGO DO AMIGO (Cole aqui):</p>
-        <textarea id="codigo-amigo" placeholder="Cole o código dele aqui..."></textarea>
-        <button id="btn-conectar" style="background: #23a559;">2. CONECTAR VOZ</button>
+        <h3 style="margin:0; font-size: 16px;"><i class="fa-solid fa-microphone-lines"></i> NEXUS VOICE</h3>
+        <div class="card"><span class="label">1. Token</span><button id="btn-iniciar" class="btn-create">GERAR TOKEN</button><textarea id="meu-codigo" readonly></textarea><button id="btn-copy" style="background:#334155; font-size:11px; margin-top:5px;">COPIAR</button></div>
+        <div class="card"><span class="label">2. Conectar</span><textarea id="codigo-amigo" placeholder="Token do amigo..."></textarea><button id="btn-conectar" class="btn-connect">CONECTAR</button></div>
+        <div style="margin-top:auto; display:flex; justify-content:center; gap:12px;"><button class="btn-action" id="btn-mute"><i class="fa-solid fa-microphone"></i></button><button class="btn-action" onclick="location.reload()" style="background:var(--danger)"><i class="fa-solid fa-phone-slash"></i></button></div>
     </div>
 
-    <div style="flex:1; padding:20px;">
-        <div id="chat-log" style="color: #949ba4; font-size: 14px;">> Aguardando ação...</div>
+    <div class="main">
+        <div id="status-bar">
+            <div style="display:flex; align-items:center; gap:10px">
+                <div id="status-dot" style="width:8px; height:8px; border-radius:50%; background:gray"></div>
+                <span id="status-text" style="font-size:12px; font-weight:bold">OFFLINE</span>
+            </div>
+            <div class="user-display">
+                <span id="peer-nick" style="font-size:13px; color:#94a3b8; margin-right:10px">Aguardando...</span>
+                <img id="local-avatar" src="" class="user-avatar">
+            </div>
+        </div>
+        <div id="chat-log"></div>
+        <div id="typing-indicator">Amigo está digitando...</div>
+        <div class="input-area">
+            <input type="text" id="chat-input" placeholder="Aguardando conexão..." disabled autocomplete="off">
+            <button id="btn-send" style="width:50px; background:var(--primary)" disabled><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
     </div>
 
-    <audio id="remote-audio" autoplay></audio>
+    <!-- Adicionado playsinline e mutado inicialmente para bypass de autoplay -->
+    <audio id="remote-audio" autoplay playsinline></audio>
 
     <script>
         const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        const remoteAudio = document.getElementById('remote-audio');
-        const log = (m) => document.getElementById('chat-log').innerHTML += `<div>> ${m}</div>`;
+        const notificationSnd = new Audio('https://www.soundjay.com');
+        
+        let dataChannel, localStream;
+        let myData = { nick: "Eu", avatar: "" };
+        let peerData = { nick: "Amigo", avatar: "" };
+        let typingTimeout;
 
-        // Captura áudio do microfone
-        async function getMic() {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
-            return stream;
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    document.getElementById('preview-img').src = e.target.result;
+                    myData.avatar = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
         }
 
-        // Recebe o áudio do outro lado
-        pc.ontrack = (event) => {
-            remoteAudio.srcObject = event.streams[0];
-            document.getElementById('status').innerText = "CONECTADO!";
-            document.getElementById('status').style.color = "#23a559";
+        async function enterApp() {
+            const n = document.getElementById('nick-input').value.trim();
+            if(!n) return alert("Escolha um apelido!");
+            myData.nick = n;
+            if(!myData.avatar) myData.avatar = document.getElementById('preview-img').src;
+            document.getElementById('local-avatar').src = myData.avatar;
+            document.getElementById('login-overlay').style.display = 'none';
+
+            // Desbloqueia o áudio com o clique do usuário
+            notificationSnd.play().then(() => {
+                notificationSnd.pause();
+                notificationSnd.currentTime = 0;
+            });
+            // Tenta desbloquear o elemento de áudio remoto
+            const remoteAudio = document.getElementById('remote-audio');
+            remoteAudio.play().catch(() => { console.log("Áudio remoto aguardando stream..."); });
+        }
+
+        const addLog = (text, isMe, nick) => {
+            const log = document.getElementById('chat-log');
+            const div = document.createElement('div');
+            div.className = `msg ${isMe ? 'me' : ''}`;
+            div.innerHTML = `<span class="msg-nick">${nick}</span>${text}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+            if(!isMe) notificationSnd.play().catch(()=>{}); 
         };
 
-        // PASSO 1: Criar a oferta (Gerar código)
-        document.getElementById('btn-iniciar').onclick = async () => {
-            await getMic();
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            
-            // Espera os candidatos ICE carregarem para gerar o código final
-            pc.onicecandidate = (event) => {
-                if (!event.candidate) {
-                    document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription));
-                    log("Código gerado! Envie para seu amigo.");
+        const setupDC = (dc) => {
+            dataChannel = dc;
+            dataChannel.onopen = () => {
+                document.getElementById('status-dot').style.background = '#22c55e';
+                document.getElementById('status-text').innerText = 'CONECTADO';
+                document.getElementById('chat-input').disabled = false;
+                document.getElementById('btn-send').disabled = false;
+                dataChannel.send(JSON.stringify({type: 'id', nick: myData.nick, avatar: myData.avatar}));
+            };
+            dataChannel.onmessage = e => {
+                const obj = JSON.parse(e.data);
+                if(obj.type === 'id') {
+                    peerData = { nick: obj.nick, avatar: obj.avatar };
+                    document.getElementById('peer-nick').innerText = peerData.nick;
+                } else if(obj.type === 'chat') {
+                    addLog(obj.msg, false, peerData.nick);
+                } else if(obj.type === 'typing') {
+                    document.getElementById('typing-indicator').style.opacity = obj.isTyping ? "1" : "0";
+                    document.getElementById('typing-indicator').innerText = `${peerData.nick} está digitando...`;
                 }
             };
         };
 
-        // PASSO 2: Conectar usando o código do amigo
-        document.getElementById('btn-conectar').onclick = async () => {
-            const rawCode = document.getElementById('codigo-amigo').value.trim();
-            if (!rawCode) return alert("Cole o código!");
+        pc.ondatachannel = e => setupDC(e.channel);
 
-            const remoteDesc = new RTCSessionDescription(JSON.parse(atob(rawCode)));
-            await pc.setRemoteDescription(remoteDesc);
-
-            if (remoteDesc.type === "offer") {
-                await getMic();
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                
-                pc.onicecandidate = (event) => {
-                    if (!event.candidate) {
-                        document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription));
-                        log("Resposta gerada! Mande este código de volta para seu amigo.");
-                    }
-                };
-            } else {
-                log("Conexão finalizada!");
+        document.getElementById('chat-input').addEventListener('input', () => {
+            if(dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({type: 'typing', isTyping: true}));
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    dataChannel.send(JSON.stringify({type: 'typing', isTyping: false}));
+                }, 1500);
             }
+        });
+
+        async function startMic() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const src = ctx.createMediaStreamSource(localStream);
+                const ans = ctx.createAnalyser();
+                ans.fftSize = 256; src.connect(ans);
+                const data = new Uint8Array(ans.frequencyBinCount);
+                const loop = () => {
+                    ans.getByteFrequencyData(data);
+                    const vol = data.reduce((a, b) => a + b) / data.length;
+                    document.getElementById('local-avatar').classList.toggle('speaking', vol > 30);
+                    requestAnimationFrame(loop);
+                };
+                loop();
+            } catch(e) { alert("Microfone não encontrado ou acesso negado."); }
+        }
+
+        pc.ontrack = e => { 
+            const remoteAudio = document.getElementById('remote-audio');
+            if (remoteAudio.srcObject !== e.streams[0]) {
+                remoteAudio.srcObject = e.streams[0];
+            }
+        };
+
+        document.getElementById('btn-iniciar').onclick = async () => {
+            setupDC(pc.createDataChannel("chat"));
+            await startMic();
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            setTimeout(() => { document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription)); }, 1000);
+        };
+
+        document.getElementById('btn-conectar').onclick = async () => {
+            const code = document.getElementById('codigo-amigo').value.trim();
+            if(!code) return;
+            try {
+                const desc = new RTCSessionDescription(JSON.parse(atob(code)));
+                await pc.setRemoteDescription(desc);
+                if(desc.type === 'offer') {
+                    await startMic();
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    setTimeout(() => { document.getElementById('meu-codigo').value = btoa(JSON.stringify(pc.localDescription)); }, 1000);
+                }
+            } catch(e) { alert("Token inválido."); }
+        };
+
+        const handleSend = () => {
+            const el = document.getElementById('chat-input');
+            const msg = el.value.trim();
+            if(msg && dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({type: 'chat', msg: msg}));
+                dataChannel.send(JSON.stringify({type: 'typing', isTyping: false}));
+                addLog(msg, true, myData.nick);
+                el.value = '';
+            }
+        };
+
+        document.getElementById('btn-send').onclick = handleSend;
+        document.getElementById('chat-input').onkeypress = e => { if(e.key === 'Enter') handleSend(); };
+        document.getElementById('btn-copy').onclick = () => { 
+            const area = document.getElementById('meu-codigo'); 
+            area.select(); document.execCommand('copy'); 
+            alert("Token copiado!"); 
+        };
+        document.getElementById('btn-mute').onclick = function() { 
+            if(localStream) { 
+                const t = localStream.getAudioTracks()[0]; 
+                t.enabled = !t.enabled; 
+                this.classList.toggle('mute-active', !t.enabled); 
+                this.innerHTML = t.enabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>'; 
+            } 
         };
     </script>
 </body>
